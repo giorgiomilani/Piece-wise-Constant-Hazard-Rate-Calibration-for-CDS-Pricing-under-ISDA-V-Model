@@ -1,0 +1,19 @@
+recovery_rate: 0.4
+frequency: 4
+isda_v:
+  step_in_days: 1
+  cash_settle_days: 3
+  day_count: 365
+  accrual_on_default: true
+discount_curve:
+  type: flat
+  rate: 0.015
+quotes:
+  - maturity: 1
+    spread_bps: 120
+  - maturity: 3
+    spread_bps: 145
+  - maturity: 5
+    spread_bps: 170
+  - maturity: 7
+    spread_bps: 210
