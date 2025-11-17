@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cds-calibration"
+version = "0.1.0"
+description = "Piece-wise constant hazard rate calibration for CDS pricing under ISDA V model"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "AutoDev", email = "dev@example.com"}
+]
+dependencies = [
+    "numpy>=1.26",
+    "scipy>=1.11",
+    "pandas>=2.1",
+    "typer>=0.9",
+    "pyyaml>=6.0",
+    "matplotlib>=3.8"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4",
+    "pytest-cov>=4.1"
+]
+
+[project.scripts]
+cds-calibrate = "cds_calibration.cli:app"
+
