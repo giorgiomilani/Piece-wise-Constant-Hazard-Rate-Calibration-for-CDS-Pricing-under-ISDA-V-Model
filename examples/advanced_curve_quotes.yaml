@@ -1,0 +1,85 @@
+# Illustrative configuration showing all major knobs exposed by the CLI.
+# The numbers are synthetic but mimic a gently upward-sloping curve with
+# moderate credit risk.
+as_of: 2024-01-05
+notional: 100_000_000       # Show large notionals so PVs can be scaled by the CLI
+description: Base curve used for regression testing of the ISDA V pipeline.
+recovery_rate: 0.35
+frequency: 4
+isda_v:
+  step_in_days: 1
+  cash_settle_days: 3
+  day_count: 365
+  accrual_on_default: true
+  # Optional knobs the engine will accept if you want to experiment further.
+  # day_count: 360
+  # accrual_on_default: false
+payment_conventions:
+  # Placeholder block demonstrating where additional settings could live
+  # if you extend the schema locally.
+  business_day: FOLLOWING
+  calendar: TARGET
+quote_metadata:
+  currency: USD
+  doc_clause: CR14
+  roll: IMM
+  pricing_method: CLEAN
+stress_scenarios:
+  - label: bull_shock
+    spread_shift_bps: -25
+  - label: bear_shock
+    spread_shift_bps: 60
+  - label: recovery_drop
+    recovery_rate: 0.30
+valuation_controls:
+  bump_size_bps: 1.0
+  report_breakdown: true
+  include_pv01: true
+
+discount_curve:
+  type: pillars
+  pillars:
+    # tenor (years), continuously compounded zero rate
+    - [0.25, 0.0175]
+    - [0.50, 0.0180]
+    - [1.00, 0.0185]
+    - [2.00, 0.0195]
+    - [3.00, 0.0205]
+    - [4.00, 0.0215]
+    - [5.00, 0.0220]
+    - [7.00, 0.0228]
+    - [10.00, 0.0235]
+    - [15.00, 0.0240]
+    - [20.00, 0.0242]
+    - [30.00, 0.0245]
+
+quotes:
+  # Include front-end maturities for index-style curves
+  - maturity: 0.5
+    spread_bps: 95
+  - maturity: 0.75
+    spread_bps: 105
+  - maturity: 1
+    spread_bps: 115
+  - maturity: 2
+    spread_bps: 130
+  - maturity: 3
+    spread_bps: 150
+  - maturity: 4
+    spread_bps: 165
+  - maturity: 5
+    spread_bps: 175
+  - maturity: 7
+    spread_bps: 185
+  - maturity: 10
+    spread_bps: 205
+  - maturity: 12
+    spread_bps: 220
+  - maturity: 15
+    spread_bps: 245
+  - maturity: 20
+    spread_bps: 275
+  - maturity: 25
+    spread_bps: 295
+  - maturity: 30
+    spread_bps: 310
