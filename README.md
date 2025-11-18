@@ -31,7 +31,7 @@ The CLI performs four steps:
 
 1. **Load config** – parse the YAML/JSON and build the flat or pillar-based discount curve plus the CDS quotes to match.
 2. **Calibrate** – sequentially solve for the piece-wise hazard rates that make the model par spreads equal to the quoted spreads.
-3. **Publish outputs** – print the calibrated hazard rates **first** and then the CDS prices (premium leg PV, protection leg PV, and the resulting net price) for each tenor.
+3. **Publish outputs** – print the calibrated hazard rates **first** and then the CDS prices (premium leg PV, PV01/annuity, protection leg PV, and the resulting net price) for each tenor.
 4. **Plot diagnostics** – save PNGs so you can visually inspect hazard levels, conditional survival/default probabilities, and PV contributions.
 
 This makes it simple to plug in alternative data sources: just swap out the configuration file and re-run the same command.
@@ -43,6 +43,7 @@ The shipped configuration (`examples/sample_quotes.yaml`) shows the minimal fiel
 ```yaml
 recovery_rate: 0.4          # Contractual recovery used in both calibration and valuation
 frequency: 4                # Coupon payments per year (quarterly)
+notional: 10_000_000        # Optional notional for scaled PVs (defaults to 1)
 isda_v:
   step_in_days: 1           # T+1 step-in (valuation to protection start)
   cash_settle_days: 3       # ISDA standard cash-settle lag after coupons/defaults
@@ -63,6 +64,21 @@ quotes:                     # Market par spreads to match
 ```
 
 Advanced curves can be specified by setting `discount_curve.type: pillars` and supplying `pillars: [[tenor_years, zero_rate], ...]`. The CLI also accepts JSON files with the same keys, making it easy to integrate with other systems. Pass `--plot-dir <folder>` (defaults to `plots/`) to control where the PNG diagnostics land.
+
+If you want a richer starting point, `examples/advanced_curve_quotes.yaml` demonstrates:
+
+- A continuously compounded piece-wise linear discount curve bootstrapped from zero-rate pillars spanning the 3-month to 30-year points.
+- Thirteen CDS quotes (0.5y through 30y) so you can stress-test the calibration routine on a long credit curve.
+- Explicit notional, metadata, and stress-scenario placeholders so the config mirrors typical trading spreadsheets.
+- Additional (commented) knobs showing where you could plug in custom business-day or accrual settings if you extend the schema locally.
+
+Run it the same way as the minimal file:
+
+```bash
+cds-calibrate examples/advanced_curve_quotes.yaml
+```
+
+After calibration the CLI prints per-unit PVs plus PV01 (premium-leg annuity per basis point). If a `notional` is supplied in the config you will also see the same figures scaled to that size, matching the PV01 + accrued adjustment view traders typically use.
 
 The `isda_v` block activates the additional conventions Burgess (2022) calls for:
 

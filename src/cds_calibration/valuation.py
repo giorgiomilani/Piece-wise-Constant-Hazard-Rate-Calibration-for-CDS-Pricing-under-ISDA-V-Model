@@ -134,6 +134,40 @@ def premium_leg_pv(
     return breakdown.total
 
 
+def premium_leg_annuity(
+    hazard_curve: PiecewiseHazardRateCurve,
+    discount_curve: DiscountCurve,
+    maturity: float,
+    params: ISDAVParameters,
+) -> float:
+    """Present value of the premium leg for a unit (100%) spread."""
+
+    return premium_leg_pv(
+        hazard_curve=hazard_curve,
+        discount_curve=discount_curve,
+        maturity=maturity,
+        spread=1.0,
+        params=params,
+    )
+
+
+def pv01(
+    hazard_curve: PiecewiseHazardRateCurve,
+    discount_curve: DiscountCurve,
+    maturity: float,
+    params: ISDAVParameters,
+) -> float:
+    """PV01 (annuity) expressed per basis point of spread."""
+
+    annuity = premium_leg_annuity(
+        hazard_curve=hazard_curve,
+        discount_curve=discount_curve,
+        maturity=maturity,
+        params=params,
+    )
+    return annuity / 10_000.0
+
+
 def _default_densities(
     hazard_curve: PiecewiseHazardRateCurve,
     times: np.ndarray,
@@ -214,11 +248,10 @@ def par_spread(
         maturity=maturity,
         params=params,
     )
-    annuity = premium_leg_pv(
+    annuity = premium_leg_annuity(
         hazard_curve=hazard_curve,
         discount_curve=discount_curve,
         maturity=maturity,
-        spread=1.0,
         params=params,
     )
     if annuity == 0:
