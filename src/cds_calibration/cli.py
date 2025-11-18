@@ -47,7 +47,14 @@ def _build_quotes(config: Dict[str, Any]):
     quotes_cfg = config.get("quotes")
     if not quotes_cfg:
         raise typer.BadParameter("quotes missing from configuration")
-    return [CDSQuote(maturity=float(item["maturity"]), spread_bps=float(item["spread_bps"])) for item in quotes_cfg]
+    quotes = []
+    for item in quotes_cfg:
+        maturity = float(item["maturity"])
+        spread = float(item["spread_bps"])
+        coupon_value = item.get("coupon_bps")
+        coupon = float(coupon_value) if coupon_value is not None else None
+        quotes.append(CDSQuote(maturity=maturity, spread_bps=spread, coupon_bps=coupon))
+    return quotes
 
 
 def _build_isda_params(config: Dict[str, Any]) -> ISDAVParameters:
@@ -114,12 +121,18 @@ def main(
         discount_curve=discount_curve,
         quotes=quotes,
         params=params,
+    )
+    cli_rows = _price_quotes(
+        hazard_curve=result.hazard_curve,
+        discount_curve=discount_curve,
+        quotes=quotes,
+        params=params,
         notional=notional,
     )
 
     typer.echo("\nCDS PVs per unit notional:")
     typer.echo("  Mat    Premium       Protection        Net        PV01/bp")
-    for row in pricing_rows:
+    for row in cli_rows:
         typer.echo(
             f"  {row['maturity']:>4.1f}y  {row['premium']:>10.6f}    {row['protection']:>10.6f}    {row['net']:>10.6f}"
             f"    {row['pv01']:>10.6f}"
@@ -128,13 +141,13 @@ def main(
     if notional != 1.0:
         typer.echo(f"\nScaled PVs for notional {notional:,.2f}:")
         typer.echo("  Mat    Premium       Protection        Net        PV01/bp")
-        for row in pricing_rows:
+        for row in cli_rows:
             typer.echo(
                 f"  {row['maturity']:>4.1f}y  {row['premium_notional']:>10.2f}    {row['protection_notional']:>10.2f}"
                 f"    {row['net_notional']:>10.2f}    {row['pv01_notional']:>10.2f}"
             )
 
-    last = pricing_rows[-1]
+    last = cli_rows[-1]
     typer.echo("\nValuation summary at input spread (per unit notional):")
     typer.echo(f"  Premium leg PV:        {last['premium']:,.6f}")
     typer.echo(f"  PV01 (1bp annuity):    {last['pv01']:,.6f}")
@@ -189,7 +202,7 @@ def _price_quotes(
             hazard_curve=hazard_curve,
             discount_curve=discount_curve,
             maturity=quote.maturity,
-            spread=quote.spread_decimal,
+            coupon=quote.coupon_decimal,
             params=params,
         )
         protection = protection_leg_pv(

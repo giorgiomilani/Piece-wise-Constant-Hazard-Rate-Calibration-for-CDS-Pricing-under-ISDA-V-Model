@@ -24,7 +24,7 @@ def test_pv01_aligns_with_annuity():
     assert math.isclose(annuity, pv01_value * 10_000.0, rel_tol=1e-12)
 
 
-def test_premium_leg_scales_with_spread():
+def test_premium_leg_scales_with_coupon():
     hazard, discount, params = _fixtures()
     annuity = premium_leg_annuity(hazard_curve=hazard, discount_curve=discount, maturity=5.0, params=params)
     spread = 150.0 / 10_000.0
@@ -32,7 +32,7 @@ def test_premium_leg_scales_with_spread():
         hazard_curve=hazard,
         discount_curve=discount,
         maturity=5.0,
-        spread=spread,
+        coupon=spread,
         params=params,
     )
     assert math.isclose(premium, annuity * spread, rel_tol=1e-12)

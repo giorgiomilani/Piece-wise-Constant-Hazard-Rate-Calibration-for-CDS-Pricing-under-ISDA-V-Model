@@ -56,7 +56,7 @@ def price_quotes(
             hazard_curve=hazard_curve,
             discount_curve=discount_curve,
             maturity=quote.maturity,
-            spread=quote.spread_decimal,
+            coupon=quote.coupon_decimal,
             params=params,
         )
         protection = protection_leg_pv(

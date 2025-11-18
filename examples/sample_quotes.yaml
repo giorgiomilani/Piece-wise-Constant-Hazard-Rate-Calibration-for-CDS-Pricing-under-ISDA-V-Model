@@ -11,9 +11,13 @@ discount_curve:
 quotes:
   - maturity: 1
     spread_bps: 120
+    coupon_bps: 100
   - maturity: 3
     spread_bps: 145
+    coupon_bps: 100
   - maturity: 5
     spread_bps: 170
+    coupon_bps: 100
   - maturity: 7
     spread_bps: 210
+    coupon_bps: 100

@@ -55,6 +55,7 @@ discount_curve:             # Discount curve builder instructions
 quotes:                     # Market par spreads to match
   - maturity: 1             # CDS tenor in years
     spread_bps: 120         # Spread quoted in basis points
+    coupon_bps: 100         # Optional running coupon (defaults to spread if omitted)
   - maturity: 3
     spread_bps: 145
   - maturity: 5
