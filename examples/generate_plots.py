@@ -22,7 +22,7 @@ from cds_calibration.plots import (
 from cds_calibration.reporting import par_reconciliation, price_quotes
 from cds_calibration.valuation import CDSQuote, par_spread
 
-DEFAULT_CONFIG = Path(__file__).with_name("sample_quotes.yaml")
+DEFAULT_CONFIG = Path(__file__).with_name("advanced_curve_quotes.yaml")
 DEFAULT_PLOT_DIR = Path("plots/extended")
 
 

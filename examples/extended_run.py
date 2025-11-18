@@ -25,7 +25,7 @@ from cds_calibration.reporting import (
     price_quotes,
 )
 
-CONFIG_PATH = Path(__file__).with_name("sample_quotes.yaml")
+CONFIG_PATH = Path(__file__).with_name("advanced_curve_quotes.yaml")
 ANSI_GREEN = "\033[92m"
 ANSI_RED = "\033[91m"
 ANSI_CYAN = "\033[96m"
