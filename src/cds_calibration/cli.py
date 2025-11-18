@@ -4,17 +4,15 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Dict, Iterable, List
+from typing import Any, Dict
 
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-import numpy as np
 import typer
 import yaml
 
 from .calibration import calibrate_piecewise_hazard
 from .curves import FlatDiscountCurve, build_from_zero_rates
+from .plots import save_core_diagnostics
+from .reporting import par_reconciliation, price_quotes
 from .valuation import (
     CDSQuote,
     ISDAVParameters,
@@ -111,7 +109,7 @@ def main(
     for quote, segment in zip(quotes, result.hazard_curve.segments):
         typer.echo(f"  {quote.maturity:>4.1f}y -> {segment.hazard_rate:.4%}")
 
-    pricing_rows = _price_quotes(
+    pricing_rows = price_quotes(
         hazard_curve=result.hazard_curve,
         discount_curve=discount_curve,
         quotes=quotes,
@@ -155,24 +153,25 @@ def main(
     typer.echo(f"  Accrual on default:  {last['accrual']:,.6f}")
 
     typer.echo("\nValidation vs market par spreads:")
-    for quote in quotes:
-        model = par_spread(
-            hazard_curve=result.hazard_curve,
-            discount_curve=discount_curve,
-            maturity=quote.maturity,
-            params=params,
-        )
+    par_rows = par_reconciliation(
+        hazard_curve=result.hazard_curve,
+        discount_curve=discount_curve,
+        quotes=quotes,
+        params=params,
+    )
+    typer.echo("  Mat    Market (bps)    Model (bps)    Error (bps)")
+    for row in par_rows:
         typer.echo(
-            f"  {quote.maturity:>4.1f}y market={quote.spread_decimal:.4%} model={model:.4%} error={(model-quote.spread_decimal)*1e4:.2f} bps"
+            f"  {row.maturity:>4.1f}y  {row.market_bps:>12.4f}    {row.model_bps:>11.4f}    {row.error_bps:>10.4f}"
         )
 
     plot_dir = plot_dir.expanduser()
-    _generate_plots(
+    save_core_diagnostics(
         hazard_curve=result.hazard_curve,
         params=params,
         quotes=quotes,
         pricing_rows=pricing_rows,
-        plot_dir=plot_dir,
+        destination=plot_dir,
     )
     typer.echo(f"\nSaved diagnostic plots under {plot_dir.resolve()}")
 

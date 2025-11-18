@@ -16,9 +16,13 @@ from cds_calibration.hazard import HazardSegment, PiecewiseHazardRateCurve
 from cds_calibration.valuation import (
     CDSQuote,
     ISDAVParameters,
-    premium_leg_breakdown,
-    protection_leg_pv,
     par_spread,
+)
+from cds_calibration.reporting import (
+    ParErrorRow,
+    PricingRow,
+    par_reconciliation,
+    price_quotes,
 )
 
 CONFIG_PATH = Path(__file__).with_name("sample_quotes.yaml")
@@ -75,63 +79,34 @@ def _hazard_table(segments: Iterable[HazardSegment]) -> pd.DataFrame:
     )
 
 
-def _pricing_table(
-    hazard_curve: PiecewiseHazardRateCurve,
-    discount_curve: DiscountCurve,
-    quotes: Sequence[CDSQuote],
-    params: ISDAVParameters,
-) -> pd.DataFrame:
-    rows: List[dict] = []
-    for quote in quotes:
-        breakdown = premium_leg_breakdown(
-            hazard_curve=hazard_curve,
-            discount_curve=discount_curve,
-            maturity=quote.maturity,
-            spread=quote.spread_decimal,
-            params=params,
-        )
-        protection = protection_leg_pv(
-            hazard_curve=hazard_curve,
-            discount_curve=discount_curve,
-            maturity=quote.maturity,
-            params=params,
-        )
-        rows.append(
+def _pricing_table(rows: Sequence[PricingRow]) -> pd.DataFrame:
+    return pd.DataFrame(
+        [
             {
-                "Mat (y)": quote.maturity,
-                "Premium PV": breakdown.total,
-                "Protection PV": protection,
-                "Net PV": protection - breakdown.total,
-                "Coupon PV": breakdown.coupon_pv,
-                "Accrual PV": breakdown.accrual_on_default_pv,
+                "Mat (y)": row.maturity,
+                "Premium PV": row.premium,
+                "Protection PV": row.protection,
+                "Net PV": row.net,
+                "Coupon PV": row.coupon,
+                "Accrual PV": row.accrual,
             }
-        )
-    return pd.DataFrame(rows)
+            for row in rows
+        ]
+    )
 
 
-def _par_table(
-    hazard_curve: PiecewiseHazardRateCurve,
-    discount_curve: DiscountCurve,
-    quotes: Sequence[CDSQuote],
-    params: ISDAVParameters,
-) -> pd.DataFrame:
-    rows = []
-    for quote in quotes:
-        model = par_spread(
-            hazard_curve=hazard_curve,
-            discount_curve=discount_curve,
-            maturity=quote.maturity,
-            params=params,
-        )
-        rows.append(
+def _par_table(rows: Sequence[ParErrorRow]) -> pd.DataFrame:
+    return pd.DataFrame(
+        [
             {
-                "Maturity (y)": quote.maturity,
-                "Market (bps)": quote.spread_bps,
-                "Model (bps)": model * 10_000,
-                "Error (bps)": (model - quote.spread_decimal) * 10_000,
+                "Maturity (y)": row.maturity,
+                "Market (bps)": row.market_bps,
+                "Model (bps)": row.model_bps,
+                "Error (bps)": row.error_bps,
             }
-        )
-    return pd.DataFrame(rows)
+            for row in rows
+        ]
+    )
 
 
 def _parallel_bump(quotes: Sequence[CDSQuote], bump_bps: float) -> List[CDSQuote]:
@@ -165,18 +140,26 @@ def _scenario_sensitivity(
     bumps: Sequence[float] = (-50, -25, -10, 0, 10, 25, 50),
 ) -> pd.DataFrame:
     base_result = _calibrate(base_quotes, discount_curve, params)
-    base_pricing = _pricing_table(
-        base_result.hazard_curve, discount_curve, base_quotes, params
+    base_pricing = price_quotes(
+        hazard_curve=base_result.hazard_curve,
+        discount_curve=discount_curve,
+        quotes=base_quotes,
+        params=params,
     )
-    base_net_pv = base_pricing["Net PV"].sum()
+    base_net_pv = sum(row.net for row in base_pricing)
     base_five_year = _five_year_par_spread(base_result.hazard_curve, discount_curve, params)
 
     rows: List[dict] = []
     for bump in bumps:
         bumped_quotes = _parallel_bump(base_quotes, bump)
         result = _calibrate(bumped_quotes, discount_curve, params)
-        pricing = _pricing_table(result.hazard_curve, discount_curve, bumped_quotes, params)
-        net_pv = pricing["Net PV"].sum()
+        pricing = price_quotes(
+            hazard_curve=result.hazard_curve,
+            discount_curve=discount_curve,
+            quotes=bumped_quotes,
+            params=params,
+        )
+        net_pv = sum(row.net for row in pricing)
         five_year = _five_year_par_spread(result.hazard_curve, discount_curve, params)
         rows.append(
             {
@@ -207,16 +190,28 @@ def run_examples(config_path: Path = CONFIG_PATH) -> None:
         print(f"\n=== Scenario: {name} ===\n")
         result = _calibrate(quotes, discount_curve, params)
         hazard_curve = result.hazard_curve
+        pricing_rows = price_quotes(
+            hazard_curve=hazard_curve,
+            discount_curve=discount_curve,
+            quotes=quotes,
+            params=params,
+        )
+        par_rows = par_reconciliation(
+            hazard_curve=hazard_curve,
+            discount_curve=discount_curve,
+            quotes=quotes,
+            params=params,
+        )
         print(_render_table(_hazard_table(hazard_curve.segments), "Hazard curve"))
         print(
             _render_table(
-                _pricing_table(hazard_curve, discount_curve, quotes, params),
+                _pricing_table(pricing_rows),
                 "Premium vs protection PV",
             )
         )
         print(
             _render_table(
-                _par_table(hazard_curve, discount_curve, quotes, params),
+                _par_table(par_rows),
                 "Par spread reconciliation",
             )
         )
