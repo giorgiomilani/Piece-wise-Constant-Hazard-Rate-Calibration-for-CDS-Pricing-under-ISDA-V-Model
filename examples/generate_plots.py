@@ -16,7 +16,6 @@ from cds_calibration.cli import (
 )
 from cds_calibration.plots import (
     plot_par_errors,
-    plot_premium_decomposition,
     plot_sensitivity_curve,
     save_core_diagnostics,
 )
@@ -100,7 +99,6 @@ def generate_plots(config_path: Path, plot_dir: Path) -> None:
         pricing_rows=pricing_rows,
         destination=plot_dir,
     )
-    plot_premium_decomposition(pricing_rows, plot_dir / "premium_breakdown.png")
     plot_par_errors(par_rows, plot_dir / "par_spread_errors.png")
     sensitivity_rows = _scenario_sensitivity(quotes, discount_curve, params)
     plot_sensitivity_curve(sensitivity_rows, plot_dir / "spread_sensitivity.png")

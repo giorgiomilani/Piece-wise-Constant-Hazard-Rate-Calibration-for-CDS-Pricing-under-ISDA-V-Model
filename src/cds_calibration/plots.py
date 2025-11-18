@@ -40,7 +40,10 @@ def plot_hazard_curve(hazard_curve: PiecewiseHazardRateCurve, destination: Path)
     if not x:
         return
     plt.figure(figsize=(6, 4))
-    plt.plot(x, y, drawstyle="steps-post", label="Hazard rate")
+    plt.step(x, y, where="post", linewidth=2.0, label="Hazard rate")
+    plt.fill_between(x, y, step="post", alpha=0.15, color="tab:blue")
+    for boundary in [segment.start for segment in hazard_curve.segments[1:]]:
+        plt.axvline(boundary, color="black", linestyle="--", linewidth=0.7, alpha=0.4)
     plt.xlabel("Time (years)")
     plt.ylabel("Hazard rate")
     plt.title("Piece-wise Hazard Structure")
@@ -68,8 +71,9 @@ def plot_probabilities(
     surv = surv / base
     default = 1.0 - surv
     plt.figure(figsize=(6, 4))
-    plt.plot(grid, surv, label="Survival probability")
-    plt.plot(grid, default, label="Default probability")
+    plt.plot(grid, surv, label="Survival probability", linewidth=2.0)
+    plt.plot(grid, default, label="Default probability", linewidth=2.0)
+    plt.fill_between(grid, surv, default, where=surv >= default, color="tab:blue", alpha=0.1)
     plt.xlabel("Time (years)")
     plt.ylabel("Probability")
     plt.title("Conditional Survival vs Default")
@@ -92,9 +96,11 @@ def plot_pv_contributions(pricing_rows: Sequence[PricingRow], destination: Path)
     x = np.arange(len(maturities))
     width = 0.35
     plt.figure(figsize=(7, 4))
-    plt.bar(x - width / 2, premium, width, label="Premium leg")
-    plt.bar(x + width / 2, protection, width, label="Protection leg")
-    plt.plot(x, net, color="black", marker="o", label="Net PV")
+    plt.bar(x - width / 2, premium, width, label="Premium leg", color="tab:blue")
+    plt.bar(x + width / 2, protection, width, label="Protection leg", color="tab:orange")
+    plt.plot(x, net, color="black", marker="o", linewidth=2.0, label="Net PV")
+    for idx, value in enumerate(net):
+        plt.annotate(f"{value:.3f}", (x[idx], net[idx]), textcoords="offset points", xytext=(0, 6), ha="center")
     plt.xticks(x, [f"{m:.0f}y" for m in maturities])
     plt.ylabel("Present value")
     plt.title("PV Contributions by Tenor")
@@ -133,8 +139,9 @@ def plot_par_errors(rows: Sequence[ParErrorRow], destination: Path) -> None:
     maturities = [row.maturity for row in data]
     errors = [row.error_bps for row in data]
     x = np.arange(len(data))
+    colors = ["tab:red" if error >= 0 else "tab:green" for error in errors]
     plt.figure(figsize=(7, 4))
-    plt.bar(x, errors, color="tab:red")
+    plt.bar(x, errors, color=colors, edgecolor="black")
     plt.axhline(0.0, color="black", linewidth=1)
     plt.xticks(x, [f"{m:.0f}y" for m in maturities])
     plt.ylabel("Error (bps)")
@@ -153,16 +160,18 @@ def plot_sensitivity_curve(rows: Iterable[Mapping[str, float]], destination: Pat
     delta_par = [row["delta_five_year_bps"] for row in data]
     delta_pv = [row["delta_net_pv"] for row in data]
     fig, ax1 = plt.subplots(figsize=(7, 4))
-    ax1.plot(bumps, delta_par, marker="o", color="tab:blue", label="Δ 5Y par (bps)")
+    ax1.plot(bumps, delta_par, marker="o", linewidth=2.0, color="tab:blue", label="Δ 5Y par (bps)")
     ax1.set_xlabel("Parallel spread bump (bps)")
     ax1.set_ylabel("Δ 5Y par (bps)", color="tab:blue")
     ax1.tick_params(axis="y", labelcolor="tab:blue")
-    ax1.grid(True, axis="x", alpha=0.3)
+    ax1.axhline(0.0, color="tab:blue", alpha=0.2)
+    ax1.grid(True, axis="both", alpha=0.3)
 
     ax2 = ax1.twinx()
-    ax2.plot(bumps, delta_pv, marker="s", color="tab:orange", label="Δ net PV")
+    ax2.plot(bumps, delta_pv, marker="s", linewidth=2.0, color="tab:orange", label="Δ net PV")
     ax2.set_ylabel("Δ net PV", color="tab:orange")
     ax2.tick_params(axis="y", labelcolor="tab:orange")
+    ax2.axhline(0.0, color="tab:orange", alpha=0.2)
 
     lines, labels = [], []
     for ax in (ax1, ax2):
