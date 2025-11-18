@@ -4,23 +4,18 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Dict, Iterable, List
+from typing import Any, Dict
 
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-import numpy as np
 import typer
 import yaml
 
 from .calibration import calibrate_piecewise_hazard
 from .curves import FlatDiscountCurve, build_from_zero_rates
+from .plots import save_core_diagnostics
+from .reporting import par_reconciliation, price_quotes
 from .valuation import (
     CDSQuote,
     ISDAVParameters,
-    par_spread,
-    premium_leg_breakdown,
-    protection_leg_pv,
 )
 
 app = typer.Typer(help="ISDA V CDS calibration utilities")
@@ -92,7 +87,7 @@ def main(
     for quote, segment in zip(quotes, result.hazard_curve.segments):
         typer.echo(f"  {quote.maturity:>4.1f}y -> {segment.hazard_rate:.4%}")
 
-    pricing_rows = _price_quotes(
+    pricing_rows = price_quotes(
         hazard_curve=result.hazard_curve,
         discount_curve=discount_curve,
         quotes=quotes,
@@ -100,148 +95,36 @@ def main(
     )
 
     typer.echo("\nCDS PVs (premium first, then protection):")
-    typer.echo("  Mat    Premium       Protection        Net")
+    typer.echo(
+        "  Mat    Premium PV    Protection PV       Net PV    Coupon PV   Accrual PV"
+    )
     for row in pricing_rows:
         typer.echo(
-            f"  {row['maturity']:>4.1f}y  {row['premium']:>10.6f}    {row['protection']:>10.6f}    {row['net']:>10.6f}"
+            f"  {row.maturity:>4.1f}y  {row.premium:>11.6f}    {row.protection:>12.6f}    {row.net:>10.6f}    {row.coupon:>10.6f}   {row.accrual:>10.6f}"
         )
-
-    last = pricing_rows[-1]
-    typer.echo("\nLast maturity premium breakdown:")
-    typer.echo(f"  Coupons:             {last['coupon']:,.6f}")
-    typer.echo(f"  Accrual on default:  {last['accrual']:,.6f}")
 
     typer.echo("\nValidation vs market par spreads:")
-    for quote in quotes:
-        model = par_spread(
-            hazard_curve=result.hazard_curve,
-            discount_curve=discount_curve,
-            maturity=quote.maturity,
-            params=params,
-        )
+    par_rows = par_reconciliation(
+        hazard_curve=result.hazard_curve,
+        discount_curve=discount_curve,
+        quotes=quotes,
+        params=params,
+    )
+    typer.echo("  Mat    Market (bps)    Model (bps)    Error (bps)")
+    for row in par_rows:
         typer.echo(
-            f"  {quote.maturity:>4.1f}y market={quote.spread_decimal:.4%} model={model:.4%} error={(model-quote.spread_decimal)*1e4:.2f} bps"
+            f"  {row.maturity:>4.1f}y  {row.market_bps:>12.4f}    {row.model_bps:>11.4f}    {row.error_bps:>10.4f}"
         )
 
     plot_dir = plot_dir.expanduser()
-    _generate_plots(
+    save_core_diagnostics(
         hazard_curve=result.hazard_curve,
         params=params,
         quotes=quotes,
         pricing_rows=pricing_rows,
-        plot_dir=plot_dir,
+        destination=plot_dir,
     )
     typer.echo(f"\nSaved diagnostic plots under {plot_dir.resolve()}")
-
-
-def _price_quotes(
-    hazard_curve,
-    discount_curve,
-    quotes,
-    params,
-):
-    rows: List[Dict[str, float]] = []
-    for quote in quotes:
-        breakdown = premium_leg_breakdown(
-            hazard_curve=hazard_curve,
-            discount_curve=discount_curve,
-            maturity=quote.maturity,
-            spread=quote.spread_decimal,
-            params=params,
-        )
-        protection = protection_leg_pv(
-            hazard_curve=hazard_curve,
-            discount_curve=discount_curve,
-            maturity=quote.maturity,
-            params=params,
-        )
-        rows.append(
-            {
-                "maturity": quote.maturity,
-                "premium": breakdown.total,
-                "protection": protection,
-                "net": protection - breakdown.total,
-                "coupon": breakdown.coupon_pv,
-                "accrual": breakdown.accrual_on_default_pv,
-            }
-        )
-    return rows
-
-
-def _generate_plots(hazard_curve, params, quotes, pricing_rows, plot_dir: Path) -> None:
-    plot_dir.mkdir(parents=True, exist_ok=True)
-    _plot_hazard_curve(hazard_curve, plot_dir / "hazard_curve.png")
-    _plot_probabilities(hazard_curve, params, quotes[-1].maturity, plot_dir / "survival_default.png")
-    _plot_pv_contributions(pricing_rows, plot_dir / "pv_contributions.png")
-
-
-def _plot_hazard_curve(hazard_curve, destination: Path) -> None:
-    x: List[float] = []
-    y: List[float] = []
-    for segment in hazard_curve.segments:
-        x.extend([segment.start, segment.end])
-        y.extend([segment.hazard_rate, segment.hazard_rate])
-    plt.figure(figsize=(6, 4))
-    plt.plot(x, y, drawstyle="steps-post", label="Hazard rate")
-    plt.xlabel("Time (years)")
-    plt.ylabel("Hazard rate")
-    plt.title("Piece-wise Hazard Structure")
-    plt.grid(True, alpha=0.3)
-    plt.legend()
-    plt.tight_layout()
-    plt.savefig(destination)
-    plt.close()
-
-
-def _plot_probabilities(hazard_curve, params, maturity: float, destination: Path) -> None:
-    if maturity <= 0:
-        return
-    grid = np.linspace(0.0, maturity, 200)
-    base = hazard_curve.survival_probability(params.step_in_years)
-    surv = np.array(
-        [hazard_curve.survival_probability(params.step_in_years + float(t)) for t in grid],
-        dtype=float,
-    )
-    surv = surv / base
-    default = 1.0 - surv
-    plt.figure(figsize=(6, 4))
-    plt.plot(grid, surv, label="Survival probability")
-    plt.plot(grid, default, label="Default probability")
-    plt.xlabel("Time (years)")
-    plt.ylabel("Probability")
-    plt.title("Conditional Survival vs Default")
-    plt.ylim(0.0, 1.0)
-    plt.grid(True, alpha=0.3)
-    plt.legend()
-    plt.tight_layout()
-    plt.savefig(destination)
-    plt.close()
-
-
-def _plot_pv_contributions(pricing_rows: Iterable[Dict[str, float]], destination: Path) -> None:
-    rows = list(pricing_rows)
-    if not rows:
-        return
-    maturities = [row["maturity"] for row in rows]
-    premium = [row["premium"] for row in rows]
-    protection = [row["protection"] for row in rows]
-    net = [row["net"] for row in rows]
-    x = np.arange(len(maturities))
-    width = 0.35
-    plt.figure(figsize=(7, 4))
-    plt.bar(x - width / 2, premium, width, label="Premium leg")
-    plt.bar(x + width / 2, protection, width, label="Protection leg")
-    plt.plot(x, net, color="black", marker="o", label="Net PV")
-    plt.xticks(x, [f"{m:.0f}y" for m in maturities])
-    plt.ylabel("Present value")
-    plt.title("PV Contributions by Tenor")
-    plt.grid(True, axis="y", alpha=0.3)
-    plt.legend()
-    plt.tight_layout()
-    plt.savefig(destination)
-    plt.close()
-
-
 if __name__ == "__main__":
     app()
 

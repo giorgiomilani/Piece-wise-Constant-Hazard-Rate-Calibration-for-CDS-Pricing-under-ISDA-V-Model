@@ -73,6 +73,16 @@ The `isda_v` block activates the additional conventions Burgess (2022) calls for
 
 These settings flow through to both calibration and valuation so the quoted spreads you provide are matched under the full ISDA V conventions rather than the simplistic "flat" CDS model.
 
+### Extended diagnostics
+
+For richer visualizations and a clearer premium-leg decomposition (coupon vs accrual on default), run:
+
+```bash
+python examples/generate_plots.py --config examples/sample_quotes.yaml --plot-dir outputs/analysis
+```
+
+The helper script recalibrates the hazard curve, writes the standard CLI plots, and adds premium vs accrual stacks, par-spread error bars, and a full parallel-spread sensitivity chart so you can inspect how the term structure reacts to different scenarios.
+
 
 ## Project Structure
 
