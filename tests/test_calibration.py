@@ -1,3 +1,4 @@
+import math
 from pathlib import Path
 
 import pandas as pd
@@ -67,3 +68,26 @@ def test_calibration_matches_market():
     )
     print(_render_table(error_table, "Par Spread Reconciliation"))
     print(commentary)
+
+
+def test_build_quotes_supports_coupon_override():
+    config = {
+        "quotes": [
+            {
+                "maturity": 5,
+                "spread_bps": 150,
+                "coupon_bps": 100,
+            }
+        ]
+    }
+    quote = _build_quotes(config)[0]
+    assert quote.coupon_bps == 100
+    assert math.isclose(quote.coupon_decimal, 0.01)
+    assert math.isclose(quote.spread_decimal, 0.015)
+
+
+def test_coupon_defaults_to_spread_when_omitted():
+    config = {"quotes": [{"maturity": 2, "spread_bps": 75}]}
+    quote = _build_quotes(config)[0]
+    assert quote.coupon_bps is None
+    assert math.isclose(quote.coupon_decimal, quote.spread_decimal)

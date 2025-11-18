@@ -91,7 +91,7 @@ def premium_leg_breakdown(
     hazard_curve: PiecewiseHazardRateCurve,
     discount_curve: DiscountCurve,
     maturity: float,
-    spread: float,
+    coupon: float,
     params: ISDAVParameters,
 ) -> PremiumLegBreakdown:
     times = year_fractions(maturity, params.frequency)
@@ -101,7 +101,7 @@ def premium_leg_breakdown(
     accruals = times - starts
     surv_end = conditional_survival_probabilities(hazard_curve, times, params)
     dfs_coupon = _discount_factors(discount_curve, times, params.payment_offset)
-    coupon_leg = float(np.sum(spread * accruals * dfs_coupon * surv_end))
+    coupon_leg = float(np.sum(coupon * accruals * dfs_coupon * surv_end))
 
     if not params.accrual_on_default:
         return PremiumLegBreakdown(coupon_pv=coupon_leg, accrual_on_default_pv=0.0)
@@ -112,7 +112,7 @@ def premium_leg_breakdown(
         params=params,
         starts=starts,
         ends=times,
-        spread=spread,
+        coupon=coupon,
     )
     return PremiumLegBreakdown(coupon_pv=coupon_leg, accrual_on_default_pv=accrual_on_default)
 
@@ -121,14 +121,14 @@ def premium_leg_pv(
     hazard_curve: PiecewiseHazardRateCurve,
     discount_curve: DiscountCurve,
     maturity: float,
-    spread: float,
+    coupon: float,
     params: ISDAVParameters,
 ) -> float:
     breakdown = premium_leg_breakdown(
         hazard_curve=hazard_curve,
         discount_curve=discount_curve,
         maturity=maturity,
-        spread=spread,
+        coupon=coupon,
         params=params,
     )
     return breakdown.total
@@ -146,7 +146,7 @@ def premium_leg_annuity(
         hazard_curve=hazard_curve,
         discount_curve=discount_curve,
         maturity=maturity,
-        spread=1.0,
+        coupon=1.0,
         params=params,
     )
 
@@ -201,7 +201,7 @@ def _accrual_on_default_pv(
     params: ISDAVParameters,
     starts: np.ndarray,
     ends: np.ndarray,
-    spread: float,
+    coupon: float,
 ) -> float:
     total = 0.0
     for start, end in zip(starts, ends):
@@ -214,7 +214,7 @@ def _accrual_on_default_pv(
         dfs = np.array([discount_curve.df(params.payment_offset + float(t)) for t in grid], dtype=float)
         integrand = (grid - start) * densities * dfs
         total += float(np.trapezoid(integrand, grid))
-    return spread * total
+    return coupon * total
 
 
 def protection_leg_pv(
@@ -263,12 +263,28 @@ def par_spread(
 class CDSQuote:
     maturity: float
     spread_bps: float
+    coupon_bps: float | None = None
 
     @property
     def spread_decimal(self) -> float:
         return self.spread_bps / 10000.0
 
+    @property
+    def coupon_decimal(self) -> float:
+        base = self.coupon_bps if self.coupon_bps is not None else self.spread_bps
+        return base / 10_000.0
 
-def generate_quotes(data: Iterable[tuple[float, float]]) -> list[CDSQuote]:
-    return [CDSQuote(maturity=maturity, spread_bps=spread) for maturity, spread in data]
+
+def generate_quotes(data: Iterable[tuple[float, float] | tuple[float, float, float]]) -> list[CDSQuote]:
+    quotes: list[CDSQuote] = []
+    for entry in data:
+        if len(entry) == 2:
+            maturity, spread = entry
+            coupon = None
+        elif len(entry) == 3:
+            maturity, spread, coupon = entry
+        else:
+            raise ValueError("Quotes must be (maturity, spread) or (maturity, spread, coupon)")
+        quotes.append(CDSQuote(maturity=maturity, spread_bps=spread, coupon_bps=coupon))
+    return quotes
 

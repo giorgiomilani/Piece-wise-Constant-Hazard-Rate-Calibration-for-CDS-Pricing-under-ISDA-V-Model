@@ -57,29 +57,43 @@ quotes:
   # Include front-end maturities for index-style curves
   - maturity: 0.5
     spread_bps: 95
+    coupon_bps: 100
   - maturity: 0.75
     spread_bps: 105
+    coupon_bps: 100
   - maturity: 1
     spread_bps: 115
+    coupon_bps: 100
   - maturity: 2
     spread_bps: 130
+    coupon_bps: 100
   - maturity: 3
     spread_bps: 150
+    coupon_bps: 100
   - maturity: 4
     spread_bps: 165
+    coupon_bps: 100
   - maturity: 5
     spread_bps: 175
+    coupon_bps: 100
   - maturity: 7
     spread_bps: 185
+    coupon_bps: 100
   - maturity: 10
     spread_bps: 205
+    coupon_bps: 100
   - maturity: 12
     spread_bps: 220
+    coupon_bps: 100
   - maturity: 15
     spread_bps: 245
+    coupon_bps: 100
   - maturity: 20
     spread_bps: 275
+    coupon_bps: 100
   - maturity: 25
     spread_bps: 295
+    coupon_bps: 100
   - maturity: 30
     spread_bps: 310
+    coupon_bps: 100
